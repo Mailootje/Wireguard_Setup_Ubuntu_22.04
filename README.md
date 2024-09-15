@@ -1,5 +1,3 @@
-Here’s a `README.md` template for your WireGuard configurator project that you can use on GitHub:
-
 ---
 
 # WireGuard Configurator
