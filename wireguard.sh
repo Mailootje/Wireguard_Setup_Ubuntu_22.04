@@ -233,6 +233,10 @@ install_wireguard() {
         echo "qrencode is already installed."
     fi
 
+    # Prompt user for the WireGuard server port
+    read -p "Enter the port you want WireGuard to use (default is 51820): " custom_port
+    SERVER_PORT=${custom_port:-51820}  # Use the provided port or default to 51820
+
     # Generate server keys
     echo "Generating server keys..."
     SERVER_PRIVATE_KEY=$(wg genkey)
@@ -242,7 +246,7 @@ install_wireguard() {
     SERVER_CONF="/etc/wireguard/wg0.conf"
     SERVER_IP="10.0.0.1"
 
-    echo "Configuring WireGuard server..."
+    echo "Configuring WireGuard server on port $SERVER_PORT..."
     sudo mkdir -p /etc/wireguard
     sudo chmod 600 /etc/wireguard
 
