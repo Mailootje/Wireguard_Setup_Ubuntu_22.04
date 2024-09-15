@@ -1,3 +1,5 @@
+Here's an updated version of the `README.md` that includes a one-liner installation option using `curl` or `wget`:
+
 ---
 
 # WireGuard Configurator
@@ -15,38 +17,59 @@ This is a comprehensive bash script for managing a WireGuard VPN server. The scr
 - Test if UDP port is open for WireGuard.
 - Fully uninstall WireGuard and its configurations.
 
+## Quick Start: One-Line Installation
+
+You can quickly set up WireGuard on your Ubuntu 22.04 server by running the following command:
+
+### Using `curl`:
+
+```bash
+curl -O https://raw.githubusercontent.com/Mailootje/Wireguard_Setup_Ubuntu_22.04/main/wireguard.sh && chmod +x wireguard.sh && ./wireguard.sh
+```
+
+### Using `wget`:
+
+```bash
+wget https://raw.githubusercontent.com/Mailootje/Wireguard_Setup_Ubuntu_22.04/main/wireguard.sh && chmod +x wireguard.sh && ./wireguard.sh
+```
+
+This command will download the script, make it executable, and start the setup process.
+
 ## Prerequisites
 
-Before using this script, ensure that you are running a Linux distribution that supports `apt`, such as Ubuntu or Debian, as this script uses `apt` for package management.
+- Linux distribution (Ubuntu 22.04 recommended)
+- Root or sudo access
 
 ### Required Packages
 
+The script will automatically install the following packages if they are not already installed:
+
 - **WireGuard**
 - **curl**
-- **qrencode** (automatically installed by the script)
+- **qrencode**
 
-## Installation
+## Installation and Usage
 
-Clone this repository and navigate into the project directory:
+To install and run the script manually:
 
-```bash
-git clone https://github.com/yourusername/wireguard-configurator.git
-cd wireguard-configurator
-```
+1. Clone this repository:
 
-Make the script executable:
+    ```bash
+    git clone https://github.com/Mailootje/Wireguard_Setup_Ubuntu_22.04.git
+    cd Wireguard_Setup_Ubuntu_22.04
+    ```
 
-```bash
-chmod +x wireguard-configurator.sh
-```
+2. Make the script executable:
 
-## Usage
+    ```bash
+    chmod +x wireguard.sh
+    ```
 
-Run the script with:
+3. Run the script:
 
-```bash
-./wireguard-configurator.sh
-```
+    ```bash
+    ./wireguard.sh
+    ```
 
 You will be prompted with a menu of options:
 
@@ -69,44 +92,34 @@ Select an option:
 
 ### Key Functionalities
 
-1. **Install and Configure WireGuard**  
-   This option installs WireGuard, generates server keys, configures the server, enables IP forwarding, and allows you to add initial users. The script automatically installs `qrencode` for QR code generation.
-   
-2. **Add Users**  
-   When adding users, the script will generate a client configuration file and a corresponding QR code that can be scanned by the WireGuard mobile or desktop app.
+- **Install and Configure WireGuard**: This option installs WireGuard, generates server keys, configures the server, enables IP forwarding, and allows you to add initial users. The script also installs `qrencode` for generating QR codes.
+  
+- **Add Users**: Adds users to the WireGuard server, generates a client configuration, and displays a QR code in the terminal for easy import into the WireGuard mobile or desktop app.
 
-3. **Remove Users**  
-   This option removes the user's configuration and their corresponding peer entry from the server.
+- **Remove Users**: Removes the user’s configuration and peer entry from the WireGuard server.
 
-4. **Show Current Users**  
-   Lists all users that are currently configured on the WireGuard server.
+- **Show Current Users**: Lists all users currently configured on the WireGuard server.
 
-5. **Restart WireGuard Service**  
-   Restarts the WireGuard service to apply any new configuration changes.
+- **Restart WireGuard Service**: Restarts the WireGuard service to apply new configuration changes.
 
-6. **Check WireGuard Status**  
-   Shows the current WireGuard server status and active connections.
+- **Check WireGuard Status**: Displays the current status of the WireGuard server and active connections.
 
-7. **Check IP Forwarding Status**  
-   Verifies if IP forwarding is enabled on the server, which is required for proper routing.
+- **Check IP Forwarding Status**: Ensures that IP forwarding is enabled, which is required for routing traffic through the VPN.
 
-8. **Install Additional Tools**  
-   Optionally installs useful tools like:
-   - `speedtest-cli` (for testing internet speed)
-   - `nload` (for monitoring network traffic)
-   - `s-tui` (for monitoring system performance)
+- **Install Additional Tools**: Optionally installs useful tools like:
+    - `speedtest-cli` (for testing internet speed)
+    - `nload` (for monitoring network traffic)
+    - `s-tui` (for monitoring system performance)
 
-9. **Test UDP Port**  
-   Tests if the specified UDP port for WireGuard is open and accessible from outside.
+- **Test UDP Port**: Verifies if the UDP port used by WireGuard is open and accessible from outside.
 
-10. **Fully Delete WireGuard**  
-    Completely removes WireGuard and all associated configurations, including iptables rules.
+- **Fully Delete WireGuard**: Completely removes WireGuard and all associated configurations.
 
 ## Adding Users
 
-When you add a user, the script will automatically generate a configuration file and print a QR code in the terminal for easy import into the WireGuard app.
+When you add a user, the script generates a configuration file and displays a QR code for easy scanning and import into the WireGuard app.
 
-### Example User Configuration:
+### Example Client Configuration:
 
 ```
 [Interface]
@@ -120,7 +133,7 @@ Endpoint = SERVER_PUBLIC_IP:51820
 AllowedIPs = 0.0.0.0/0
 ```
 
-After adding a user, the QR code is displayed like this:
+The QR code will look something like this:
 
 ```
 ------------------------------------------------------------
@@ -149,14 +162,9 @@ Generating QR code for /etc/wireguard/username.conf:
 
 ## Uninstallation
 
-To uninstall WireGuard and remove all configurations, select the option `10` from the main menu. **Note**: This action cannot be undone.
+To completely remove WireGuard and its configuration files, select option `10` from the main menu. **Warning**: This action cannot be undone.
 
 ## Contributing
 
-Feel free to submit issues or pull requests to improve this project. All contributions are welcome!
-
-## License
-
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
-
+Contributions are welcome! Feel free to submit issues, fork this repository, and send pull requests with improvements.
 ---
