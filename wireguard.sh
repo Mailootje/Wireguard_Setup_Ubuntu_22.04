@@ -22,13 +22,14 @@ ask_option() {
     echo "2) Add users to an existing installation"
     echo "3) Remove users from an existing installation"
     echo "4) Show current users"
-    echo "5) Restart WireGuard service"
-    echo "6) Check WireGuard status"
-    echo "7) Check IP forwarding status"
-    echo "8) Install additional tools"
-    echo "9) Test if UDP port is open for WireGuard"
-    echo "10) Fully delete WireGuard installation and configuration"
-    echo "11) Exit"
+    echo "5) Generate QR code for an existing user"  # New option at position 5
+    echo "6) Restart WireGuard service"
+    echo "7) Check WireGuard status"
+    echo "8) Check IP forwarding status"
+    echo "9) Install additional tools"
+    echo "10) Test if UDP port is open for WireGuard"
+    echo "11) Fully delete WireGuard installation and configuration"
+    echo "12) Exit"
     echo "------------------------------------------------------------"
     read -p "Enter your choice: " choice
     return $choice
@@ -79,6 +80,23 @@ generate_qr_code() {
     local config_file=$1
     echo "Generating QR code for $config_file"
     qrencode -t ansiutf8 < "$config_file"
+}
+
+# Function to generate QR code from an existing user
+generate_qr_for_existing_user() {
+    echo "Existing users:"
+    echo "------------------------------------------------------------"
+    grep 'Address = ' /etc/wireguard/*.conf | awk -F'[:= ]+' '{print $1 " - " $NF}' | sed 's/\/etc\/wireguard\///;s/\.conf//'
+    echo "------------------------------------------------------------"
+    read -p "Enter the username for which you want to generate a QR code: " USERNAME
+    CLIENT_CONF="/etc/wireguard/${USERNAME}.conf"
+
+    if [ -f "$CLIENT_CONF" ]; then
+        echo "Generating QR code for $USERNAME..."
+        qrencode -t ansiutf8 < "$CLIENT_CONF"
+    else
+        echo "Error: Configuration file for user $USERNAME does not exist."
+    fi
 }
 
 # Function to remove a user
@@ -321,25 +339,28 @@ while true; do
         4)
             show_users
             ;;
-        5)
-            restart_wireguard
+        5)  # New option to generate QR code for existing user
+            generate_qr_for_existing_user
             ;;
         6)
-            check_status
+            restart_wireguard
             ;;
         7)
-            check_ip_forwarding
+            check_status
             ;;
         8)
-            install_tools
+            check_ip_forwarding
             ;;
         9)
-            test_udp_port
+            install_tools
             ;;
         10)
-            delete_wireguard
+            test_udp_port
             ;;
         11)
+            delete_wireguard
+            ;;
+        12)
             echo "Exiting."
             break
             ;;
