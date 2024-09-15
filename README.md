@@ -1,5 +1,3 @@
-Here's an updated version of the `README.md` that includes a one-liner installation option using `curl` or `wget`:
-
 ---
 
 # WireGuard Configurator
