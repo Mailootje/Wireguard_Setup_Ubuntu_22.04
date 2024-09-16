@@ -3,6 +3,7 @@
 # WireGuard Configurator
 
 This is a comprehensive bash script for managing a WireGuard VPN server. The script allows you to install WireGuard, configure the server, manage users, and generate QR codes for easy client configuration.
+https://wireguardinstaller.com/
 
 ## Features
 
