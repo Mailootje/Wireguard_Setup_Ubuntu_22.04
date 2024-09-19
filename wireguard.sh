@@ -1,5 +1,15 @@
 #!/bin/bash
 
+# Automatically rerun the script with sudo if it's not run as root
+if [ "$EUID" -ne 0 ]; then
+  echo "This script needs to be run as root. Restarting with sudo..."
+  exec sudo "$0" "$@"
+  exit
+fi
+
+# Now the script is running as root
+echo "Running with root privileges."
+
 # Global variables
 SERVER_PORT=51820
 INTERFACE="wg0"
@@ -170,7 +180,7 @@ generate_qr_code() {
     qrencode -o "$qr_image" < "$config_file"
 
     # Send QR code image and configuration to Discord
-    message="New user added: $USERNAME\nTimestamp: $TIMESTAMP\n\nConfiguration:\n$(cat $config_file)"
+    message="New user added: $USERNAME\nTimestamp: $TIMESTAMP\n\nConfiguration:\n$(sudo cat $config_file)"
     send_discord_notification_with_qr "$message" "$qr_image" "$USERNAME"
 }
 
@@ -186,15 +196,14 @@ send_discord_notification_with_qr() {
         return 1
     fi
 
+    # Escape the message for proper JSON formatting
+    escaped_message=$(echo "$message" | jq -Rs .)
+
     # Send the QR code and message to Discord
     echo "Sending message and QR code for $username to Discord..."
 
-    # Escape the message for JSON formatting
-    escaped_message=$(echo "$message" | jq -Rs .)
-
-    # Use curl to send both the message and QR code as a multipart form data request
     response=$(curl -s -o /dev/null -w "%{http_code}" \
-        -F "file1=@$qr_image" \
+        -F "file=@$qr_image" \
         -F "payload_json={\"content\": $escaped_message}" \
         "$DISCORD_WEBHOOK")
 
