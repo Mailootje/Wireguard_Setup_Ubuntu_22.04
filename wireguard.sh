@@ -3,6 +3,7 @@
 # Global variables
 SERVER_PORT=51820
 INTERFACE="wg0"
+WEBHOOK_FILE="/etc/wireguard/discord_webhook.conf"
 
 # Function to check if a command exists
 command_exists() {
@@ -14,6 +15,62 @@ get_public_ip() {
     curl -4 -s ifconfig.me
 }
 
+# Function to read or ask for Discord webhook URL
+get_discord_webhook() {
+    # Check if the webhook file exists and has content
+    if [ -f "$WEBHOOK_FILE" ] && [ -s "$WEBHOOK_FILE" ]; then
+        # Source the file to read the variable
+        source "$WEBHOOK_FILE"
+
+        # Validate the URL format
+        if ! [[ "$DISCORD_WEBHOOK" =~ ^https://discord(app)?.com/api/webhooks/[0-9]+/[A-Za-z0-9_-]+$ ]]; then
+            echo "The stored webhook URL is invalid: '$DISCORD_WEBHOOK'. Please provide a valid URL."
+            read -p "Enter the Discord webhook URL: " DISCORD_WEBHOOK
+            echo "DISCORD_WEBHOOK=\"$DISCORD_WEBHOOK\"" | sudo tee "$WEBHOOK_FILE" > /dev/null
+        else
+            return
+        fi
+    else
+        # If the file doesn't exist or is empty, prompt the user for a custom URL
+        echo "No valid Discord webhook URL found. Please provide a valid URL."
+        read -p "Enter the Discord webhook URL: " DISCORD_WEBHOOK
+
+        # Create the directory if it doesn't exist
+        sudo mkdir -p $(dirname "$WEBHOOK_FILE")
+
+        # Save the webhook URL as a variable in the file
+        echo "DISCORD_WEBHOOK=\"$DISCORD_WEBHOOK\"" | sudo tee "$WEBHOOK_FILE" > /dev/null
+        echo "Saved webhook URL: '$DISCORD_WEBHOOK'"
+    fi
+}
+
+# Function to prompt DNS selection
+select_dns() {
+    echo "------------------------------------------------------------"
+    echo "Select DNS for the client:"
+    echo "1) Use Cloudflare DNS (1.1.1.1)"
+    echo "2) Use Google DNS (8.8.8.8)"
+    echo "3) Use custom DNS"
+    echo "------------------------------------------------------------"
+    read -p "Enter your choice: " dns_choice
+    
+    case $dns_choice in
+        1)
+            CLIENT_DNS="1.1.1.1"
+            ;;
+        2)
+            CLIENT_DNS="8.8.8.8"
+            ;;
+        3)
+            read -p "Enter custom DNS: " CLIENT_DNS
+            ;;
+        *)
+            echo "Invalid option. Defaulting to Google DNS (8.8.8.8)."
+            CLIENT_DNS="8.8.8.8"
+            ;;
+    esac
+}
+
 # Function to prompt number-based menu
 ask_option() {
     echo "------------------------------------------------------------"
@@ -22,7 +79,7 @@ ask_option() {
     echo "2) Add users to an existing installation"
     echo "3) Remove users from an existing installation"
     echo "4) Show current users"
-    echo "5) Generate QR code for an existing user"  # New option at position 5
+    echo "5) Generate QR code for an existing user"
     echo "6) Restart WireGuard service"
     echo "7) Check WireGuard status"
     echo "8) Check IP forwarding status"
@@ -35,13 +92,14 @@ ask_option() {
     return $choice
 }
 
-# Function to add a user
-add_user() {
+# Function to add a single user (used by both initial install and add user)
+add_single_user() {
     read -p "Enter username: " USERNAME
     CLIENT_CONF="/etc/wireguard/${USERNAME}.conf"
     CLIENT_PRIVATE_KEY=$(wg genkey)
     CLIENT_PUBLIC_KEY=$(echo $CLIENT_PRIVATE_KEY | wg pubkey)
     CLIENT_IP="10.0.0.$((100 + $(wg show | grep allowed | wc -l)))"
+    TIMESTAMP=$(date)
 
     # Ensure the server public key is set
     SERVER_PUBLIC_KEY=$(wg show $INTERFACE public-key)
@@ -49,11 +107,14 @@ add_user() {
     # Ensure the public IP is set
     SERVER_PUBLIC_IP=$(get_public_ip)
 
+    # Prompt DNS selection
+    select_dns
+
     cat <<EOL > $CLIENT_CONF
 [Interface]
 PrivateKey = $CLIENT_PRIVATE_KEY
 Address = $CLIENT_IP/24
-DNS = 8.8.8.8
+DNS = $CLIENT_DNS
 
 [Peer]
 PublicKey = $SERVER_PUBLIC_KEY
@@ -74,12 +135,77 @@ EOL
 
     # Generate a QR code for the configuration
     generate_qr_code $CLIENT_CONF
+
+    # Send Discord notification
+    message="New user added: $USERNAME\nTimestamp: $TIMESTAMP\nConfiguration:\n$(cat $CLIENT_CONF)"
+    send_discord_notification_with_qr "$message"
+}
+
+# Function to add users (for initial install)
+add_users() {
+
+    # Ensure Discord webhook is fetched or saved
+    get_discord_webhook
+    read -p "How many users do you want to add? " USER_COUNT
+    for (( i=1; i<=USER_COUNT; i++ )); do
+        add_single_user
+    done
+}
+
+add_users_first_installation() {
+
+    read -p "How many users do you want to add? " USER_COUNT
+    for (( i=1; i<=USER_COUNT; i++ )); do
+        add_single_user
+    done
 }
 
 generate_qr_code() {
     local config_file=$1
+    local qr_image="/tmp/${USERNAME}_qr.png"
+
     echo "Generating QR code for $config_file"
-    qrencode -t ansiutf8 < "$config_file"
+    
+    # Generate QR code image in PNG format
+    qrencode -o "$qr_image" < "$config_file"
+
+    # Send QR code image and configuration to Discord
+    message="New user added: $USERNAME\nTimestamp: $TIMESTAMP\n\nConfiguration:\n$(cat $config_file)"
+    send_discord_notification_with_qr "$message" "$qr_image" "$USERNAME"
+}
+
+# Function to send a notification with a QR code image to Discord
+send_discord_notification_with_qr() {
+    local message=$1
+    local qr_image=$2
+    local username=$3
+
+    # Ensure that the DISCORD_WEBHOOK variable is set
+    if [ -z "$DISCORD_WEBHOOK" ]; then
+        echo "Error: Discord webhook URL is not set. Cannot send notification."
+        return 1
+    fi
+
+    # Send the QR code and message to Discord
+    echo "Sending message and QR code for $username to Discord..."
+
+    # Escape the message for JSON formatting
+    escaped_message=$(echo "$message" | jq -Rs .)
+
+    # Use curl to send both the message and QR code as a multipart form data request
+    response=$(curl -s -o /dev/null -w "%{http_code}" \
+        -F "file1=@$qr_image" \
+        -F "payload_json={\"content\": $escaped_message}" \
+        "$DISCORD_WEBHOOK")
+
+    # Check the response status code
+    if [ "$response" -ne 204 ]; then
+        echo "Error: Failed to send QR code to Discord (HTTP status: $response)."
+        return 1
+    fi
+
+    echo "QR code and message sent successfully to Discord."
+    return 0
 }
 
 # Function to generate QR code from an existing user
@@ -255,6 +381,9 @@ install_wireguard() {
     read -p "Enter the port you want WireGuard to use (default is 51820): " custom_port
     SERVER_PORT=${custom_port:-51820}  # Use the provided port or default to 51820
 
+    # Ensure Discord webhook is fetched or saved
+    get_discord_webhook
+
     # Generate server keys
     echo "Generating server keys..."
     SERVER_PRIVATE_KEY=$(wg genkey)
@@ -303,14 +432,8 @@ EOL
     sudo wg-quick up $INTERFACE
     sudo systemctl enable wg-quick@$INTERFACE
 
-    # Get the public IP address of the server
-    SERVER_PUBLIC_IP=$(get_public_ip)
-
     # Add initial users
-    read -p "How many users do you want to add initially? " USER_COUNT
-    for (( i=1; i<=USER_COUNT; i++ )); do
-        add_user
-    done
+    add_users_first_installation  # Call the function to add users
 }
 
 # Save the directory where the script was started
@@ -325,10 +448,7 @@ while true; do
             install_wireguard
             ;;
         2)
-            read -p "How many users do you want to add? " USER_COUNT
-            for (( i=1; i<=USER_COUNT; i++ )); do
-                add_user
-            done
+            add_users  # Reuse the same user-adding function
             ;;
         3)
             read -p "How many users do you want to remove? " USER_COUNT
@@ -361,7 +481,7 @@ while true; do
             delete_wireguard
             ;;
         12)
-            echo "Exiting."
+            echo "Good bye!"
             break
             ;;
         *)
